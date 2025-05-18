@@ -6,7 +6,8 @@ namespace WindFrostBot.SDK
     public class Config
     {
         public string BotName = "WF";
-        public bool EnableLog = true;
+        public bool EnableLog = false;
+        public string OwnerOpenID = "";
         public string AppID = "";
         public string Secret = "";
         public string FileServerUrl = "";

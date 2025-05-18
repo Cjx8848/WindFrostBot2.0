@@ -13,6 +13,21 @@ namespace WindFrostBot.SDK
             this.eventArgs = eventArgs;
             this.Type = type;
         }
+        public void SendKeyBoard(string keyid)
+        {
+            switch (Type)
+            {
+                case 0:
+                    MainSDK.QQClient.SendKeyboard(keyid, eventArgs, seq);
+                    seq++;
+                    break;
+                case 1:
+                    seq++;
+                    break;
+                default:
+                    break;
+            }
+        }
         public void SendTextMessage(string message)
         {
             switch(Type)
@@ -29,12 +44,26 @@ namespace WindFrostBot.SDK
                     break;
             }
         }
-        public void SendImage(Image img)
+        public void SendTextWithImage(byte[] data,string text, string name = "upload")
         {
             switch (Type)
             {
                 case 0:
-                    MainSDK.QQClient.SendGroupMedia(eventArgs, img, seq);
+                    var date = DateTime.Now;
+                    MainSDK.QQClient.SendGroupMedia(eventArgs, data, text, seq, $"{date.ToString().Replace("/", "-").Replace(" ", "_").Replace(":", "-")}.jpg");
+                    seq++;
+                    break;
+                case 1:
+                    break;
+            }
+        }
+        public void SendImage(byte[] data,string name = "upload")
+        {
+            switch (Type)
+            {
+                case 0:
+                    var date = DateTime.Now;
+                    MainSDK.QQClient.SendGroupMedia(eventArgs, data, seq, $"{date.ToString().Replace("/", "-").Replace(" ", "_").Replace(":","-")}.jpg");
                     seq++;
                     break;
                 case 1:

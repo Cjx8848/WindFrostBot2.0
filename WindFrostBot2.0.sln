@@ -15,6 +15,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSFTBotPlugin", "..\CSFTBot
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PatchouliBotPlugin", "..\PatchouliBotPlugin\PatchouliBotPlugin.csproj", "{AAB6E030-4262-490D-9921-525409686E7D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{CF10837A-AA76-4E3F-989D-B88BF1F4E6ED}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PatchouliBot", "..\PatchouliBotTSPlugin\PatchouliBot.csproj", "{120214A9-D087-4037-851A-06F332B8BBFF}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PatchouliMod", "..\..\..\..\..\..\Documents\My Games\Terraria\tModLoader\ModSources\PatchouliMod\PatchouliMod.csproj", "{8899E9A5-A43C-4786-B51F-0BB93AC75915}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSFTPluginLoader", "..\..\..\CSFTProjects\src\CSFTPluginLoader\CSFTPluginLoader.csproj", "{76994DF9-D2B7-49D5-89E9-5CC6CDEC398B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +56,18 @@ Global
 		{AAB6E030-4262-490D-9921-525409686E7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AAB6E030-4262-490D-9921-525409686E7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AAB6E030-4262-490D-9921-525409686E7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{120214A9-D087-4037-851A-06F332B8BBFF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{120214A9-D087-4037-851A-06F332B8BBFF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{120214A9-D087-4037-851A-06F332B8BBFF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{120214A9-D087-4037-851A-06F332B8BBFF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8899E9A5-A43C-4786-B51F-0BB93AC75915}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8899E9A5-A43C-4786-B51F-0BB93AC75915}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8899E9A5-A43C-4786-B51F-0BB93AC75915}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8899E9A5-A43C-4786-B51F-0BB93AC75915}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76994DF9-D2B7-49D5-89E9-5CC6CDEC398B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76994DF9-D2B7-49D5-89E9-5CC6CDEC398B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76994DF9-D2B7-49D5-89E9-5CC6CDEC398B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76994DF9-D2B7-49D5-89E9-5CC6CDEC398B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

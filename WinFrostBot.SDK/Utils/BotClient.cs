@@ -1,10 +1,14 @@
 ﻿using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using WindFrostBot.SDK;
+using static Mysqlx.Expect.Open.Types.Condition.Types;
 
 public class BotClient
 {
@@ -18,16 +22,18 @@ public class BotClient
     private static ClientWebSocket ?_webSocket;
     public event EventHandler<MessageEventArgs> OnMessageReceived; //私聊事件
     public event EventHandler<MessageEventArgs> OnGroupMessageReceived; //群聊事件
-
+    private Thread receiveThread;
+    private Thread heartThread;
+    public bool Connected = false;
     public BotClient(string appid, string clientsecret)
     {
         clientSecret = clientsecret;
         appId = appid;
         new Task(async () => { await Init(); }).Start();
     }
-    private static async Task UpdateTokenAsync()
+    public void Dispose()
     {
-        await GetAccessToken();
+         _webSocket?.Dispose();
     }
     public async Task Init()
     {
@@ -49,8 +55,7 @@ public class BotClient
 
             var tokenResponse = JObject.Parse(responseString);
             accessToken = tokenResponse["access_token"].ToString();
-
-            //Message.Info($"Access Token: {accessToken}");
+            Message.Info($"Access Token: {accessToken}");
         }
     }
     public async Task ConnectWebSocket()
@@ -58,38 +63,37 @@ public class BotClient
         _webSocket = new ClientWebSocket();
         await _webSocket.ConnectAsync(new Uri(gatewayUrl), CancellationToken.None);
         Message.Info("Connection opened.");
+        Connected = true;
         SendIdentify();//发送鉴定
-        new Task(async () =>
+        receiveThread = new Thread(new ThreadStart(Listener));
+        receiveThread.Start();
+    }
+    public async void Listener()
+    {
+        var buffer = new byte[1024 * 4];
+        while (_webSocket.State == WebSocketState.Open && Connected)
         {
-            var buffer = new byte[1024 * 4];
-            for(; ; )
+            var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+            var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+            try
             {
-                if (_webSocket.State == WebSocketState.Open)
+                if (!string.IsNullOrEmpty(message))
                 {
-                    var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    try
-                    {
-                        if (!string.IsNullOrEmpty(message))
-                        {
-                            //Message.Erro(message);
-                            var data = JObject.Parse(message);
-                            ProcessMessage(data);
-                        }
-                        else
-                        {
-                            Message.Erro("Recevive Empty Message...");
-                        }
-                    }
-                    catch
-                    {
-
-                    }
+                    //Message.Erro(message);
+                    var data = JObject.Parse(message);
+                    ProcessMessage(data);
+                }
+                else
+                {
+                    Message.Erro("Recevive Empty Message...");
                 }
             }
-        }, TaskCreationOptions.LongRunning).Start();
-    }
+            catch
+            {
 
+            }
+        }
+    }
     public static async void SendIdentify()
     {
         var identifyPayload = new JObject
@@ -112,7 +116,26 @@ public class BotClient
         await SendMessageAsync(identifyPayload.ToString());
         Message.Info("Identify sent.");
     }
+    public async void Hearbeat()
+    {
+        while(_webSocket?.State == WebSocketState.Open && Connected)
+        {
+            try
+            {
+                var heartbeatPayload = new JObject
+                {
+                    ["op"] = 1,
+                    ["d"] = sequenceNumber
+                };
+                await SendMessageAsync(heartbeatPayload.ToString());
+                await Task.Delay(heartbeatInterval);
+            }
+            catch
+            {
 
+            }
+        }
+    }
     private async void ProcessMessage(JObject message)
     {
         int op = message["op"].Value<int>();
@@ -124,48 +147,19 @@ public class BotClient
         {
             case 10://心跳包
                 heartbeatInterval = message["d"]["heartbeat_interval"].Value<int>();
-                #region HeartBeatSender
-                new Task(async () =>
-                {
-                    for(; ; )
-                    {
-                        if (_webSocket?.State == WebSocketState.Open)
-                        {
-                            try
-                            {
-                                var heartbeatPayload = new JObject
-                                {
-                                    ["op"] = 1,
-                                    ["d"] = sequenceNumber
-                                };
-                                await SendMessageAsync(heartbeatPayload.ToString());
-                                await Task.Delay(heartbeatInterval);
-                            }
-                            catch
-                            {
-
-                            }
-                        }
-                    }
-                }, TaskCreationOptions.LongRunning).Start();
-                #endregion
+                heartThread = new Thread(new ThreadStart(Hearbeat));
+                heartThread.Start();
                 break;
             case 7:
                 Message.Erro("Recevive Reconnecting Message...");
-                await _webSocket.ConnectAsync(new Uri(gatewayUrl), CancellationToken.None);
-                await GetAccessToken();
-                var resumePayload = new JObject
-                {
-                    ["op"] = 6,
-                    ["d"] = new JObject
-                    {
-                        ["token"] = accessToken,
-                        ["session_id"] = sessionId,
-                        ["seq"] = sequenceNumber
-                    }
-                };
-                await SendMessageAsync(resumePayload.ToString());
-                Message.Info("Reconnect to Server Successfully!");
+                Connected = false;
+                Dispose();
+                //_webSocket = new ClientWebSocket();
+                //await _webSocket.ConnectAsync(new Uri(gatewayUrl), CancellationToken.None);
+                //Connected = true;
+                //await GetAccessToken();
+                //SendIdentify();
+                //Message.Info("Reconnect to Server Successfully!");
                 break;
             case 0://群聊消息
                 string eventType = message["t"].Value<string>();
@@ -181,10 +175,14 @@ public class BotClient
                     case "GROUP_ADD_ROBOT"://机器人被添加到群的事件
                         string memberopenid = data["op_member_openid"].Value<string>();
                         string groupopenid = data["group_openid"].Value<string>();
+                        var groupevent = new GroupMessageEvent(groupopenid, memberopenid);
+                        MainSDK.OnGroupAdd.ExecuteAll(groupevent);
                         break;
                     case "GROUP_DEL_ROBOT"://机器人被移除群聊事件
                         memberopenid = data["op_member_openid"].Value<string>();
                         groupopenid = data["group_openid"].Value<string>();
+                        groupevent = new GroupMessageEvent(groupopenid, memberopenid);
+                        MainSDK.OnGroupRemove.ExecuteAll(groupevent);
                         break;
                     case "GROUP_MSG_REJECT"://群聊主动消息关闭事件
                         memberopenid = data["op_member_openid"].Value<string>();
@@ -225,6 +223,38 @@ public class BotClient
         var messageBuffer = Encoding.UTF8.GetBytes(message);
         await _webSocket.SendAsync(new ArraySegment<byte>(messageBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
     }
+    public async void SendKeyboard(string keyid, MessageEventArgs args, int seq = 1)
+    {
+        try
+        {
+            await GetAccessToken();
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+                var postData = new JObject
+                {
+                    ["content"] = "",
+                    ["msg_type"] = 2, // MD
+                    ["msg_id"] = args.MsgId,
+                    ["msg_seq"] = seq,
+                    ["keyboard"] = new JObject
+                    {
+                        ["id"] = keyid
+                    }
+                };
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                Message.Info("Sent GroupKeyBoardMessage Response: " + responseString);
+            }
+        }
+        catch(Exception ex)
+        {
+            Message.Erro(ex.ToString());
+        }
+    }
     #region Message
     public void HandleMessageCreate(JToken data)//处理私聊被动消息部分
     {
@@ -234,7 +264,7 @@ public class BotClient
 
         Message.Info($"Received Message from {author} : {content}");
 
-        OnMessageReceived?.Invoke(this, new MessageEventArgs("", content, msgId, author));
+        OnMessageReceived?.Invoke(this, new MessageEventArgs("无", content, msgId, author));
         //SendMessage(groupOpenId, $"{content}", msgId);
     }
     public async void SendMessage(string message, MessageEventArgs args, int seq = 1)
@@ -301,6 +331,7 @@ public class BotClient
     {
         try
         {
+            await GetAccessToken();
             Message.Info("尝试发送: " + fileUrl);
 
             if (string.IsNullOrEmpty(fileUrl))
@@ -362,11 +393,70 @@ public class BotClient
             Message.Erro("Error: " + ex.Message);
         }
     }
-    public async Task SendGroupMedia(MessageEventArgs args, Image img, int seq = 1)
+    public async Task SendGroupMedia(MessageEventArgs args, byte[] data,string text, int seq = 1, string name = "upload.jpg")
     {
         try
         {
-            string fileUrl = UploadImageToServer(img).Result;
+            await GetAccessToken();
+            string fileUrl = UploadImageToServer(data, name).Result;
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+                var messageData = new JObject
+                {
+                    ["content"] = text,
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["image"] = fileUrl
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", messageContent);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+                FileServerDelete(name);
+                Message.Info("Sent TextMedia Message Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
+        }
+    }
+    public async Task SendGroupMedia(MessageEventArgs args, byte[] data, int seq = 1 ,string name = "upload.jpg")
+    {
+        try
+        {
+            await GetAccessToken();
+            string fileUrl = UploadImageToServer(data, name).Result;
 
             using (var client = new HttpClient())
             {
@@ -414,7 +504,7 @@ public class BotClient
                 var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
                 var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", messageContent);
                 var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
-
+                FileServerDelete(name);
                 Message.Info("Sent Media Message Response: " + messageResponseString);
             }
         }
@@ -426,18 +516,24 @@ public class BotClient
     #endregion
 
     #region FileServer
-    public async Task<string> UploadImageToServer(Image image)
+    public void FileServerDelete(string name = "upload.jpg")
+    {
+        HttpClient httpClient = new HttpClient();
+        string requestUrl = $"{MainSDK.BotConfig.FileServerUrl}/delete/{name}";
+        httpClient.DeleteAsync(requestUrl);
+    }
+    public async Task<string> UploadImageToServer(byte[] data, string name = "upload.jpg")
     {
         using (var client = new HttpClient())
         {
             using (var ms = new MemoryStream())
             {
-                image.Save(ms, ImageFormat.Jpeg);
+                ms.Write(data, 0, data.Length);
                 var fileContent = new ByteArrayContent(ms.ToArray());
                 fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg");
                 var content = new MultipartFormDataContent();
-                content.Add(fileContent, "file", "wiki.jpg");
-                var response = await client.PostAsync(MainSDK.BotConfig.FileServerUrl, content);
+                content.Add(fileContent, "file", $"{name}");
+                var response = await client.PostAsync($"{MainSDK.BotConfig.FileServerUrl}/upload", content);
                 response.EnsureSuccessStatusCode();
                 var responseString = await response.Content.ReadAsStringAsync();
                 var jsonResponse = JObject.Parse(responseString);
@@ -454,7 +550,7 @@ public class BotClient
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
             content.Add(fileContent, "file", Path.GetFileName(filePath));
 
-            var response = await client.PostAsync(MainSDK.BotConfig.FileServerUrl, content);
+            var response = await client.PostAsync($"{MainSDK.BotConfig.FileServerUrl}/upload", content);
             response.EnsureSuccessStatusCode();
             var responseString = await response.Content.ReadAsStringAsync();
 

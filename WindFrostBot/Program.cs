@@ -3,6 +3,7 @@ using WindFrostBot.SDK;
 using Spectre.Console;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Timers;
 
 namespace WindFrostBot
 {
@@ -26,7 +27,7 @@ namespace WindFrostBot
         static void Main(string[] arg)
         {
             Init();
-            AnsiConsole.Write(new FigletText("WindFrostBot").Color(Spectre.Console.Color.Aqua));
+            AnsiConsole.Write(new FigletText("WindFrostBot").Color(Color.Aqua));
             ConfigWriter.InitConfig();
             Message.LogWriter.StartLog();
             DataBase.Init();
@@ -45,23 +46,34 @@ namespace WindFrostBot
             for(; ;)
                 Console.ReadLine();
         }
-        /*
-        private static System.Timers.Timer _timer;
-        private static void SetTimer()
+        public static bool UnLock = false;//锁
+        public static void OnUpdate(object? Sender, EventArgs e)
         {
-            _timer = new System.Timers.Timer(60 * 1000);
-            _timer.Elapsed += Update;
-            _timer.Start();
+            if (UnLock) return;
+            if (!MainSDK.QQClient.Connected)
+            {
+                try
+                {
+                    UnLock = true;
+                    Message.Info("重新连接中...");
+                    MainSDK.QQClient.Dispose();
+                    MainSDK.QQClient = new BotClient(MainSDK.BotConfig.AppID, MainSDK.BotConfig.Secret);
+                    CommandManager.InitCommandToBot();
+                }
+                catch
+                {
+                    UnLock = false;
+                }
+            }
+            UnLock = false;
         }
-        public static void Update(object Sender, EventArgs e)
-        {
-            MainSDK.QQClient = new BotClient(MainSDK.BotConfig.AppID, MainSDK.BotConfig.Secret);
-        }
-        */
-        public static  async void StartBot()
+        static readonly System.Timers.Timer Update = new System.Timers.Timer(1000);//秒时钟
+        public static  void StartBot()
         {
             MainSDK.QQClient = new BotClient(MainSDK.BotConfig.AppID, MainSDK.BotConfig.Secret);
             CommandManager.InitCommandToBot();
+            Update.Elapsed += OnUpdate;
+            Update.Start();
         }
     }
 }

@@ -1,0 +1,357 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp;
+
+namespace WindFrostBot.SDK.Utils.Images;
+
+public class ListCell
+{
+    public string Text { get; set; }
+    public Color TextColor { get; set; } = Color.Black;
+    public bool UseTextColor { get; set; }
+
+    public bool UseBackgroundColor { get; set; }
+
+    public ListCell(string text, Color textColor)
+    {
+        Text = text;
+        TextColor = textColor;
+        UseTextColor = true;
+    }
+
+    public ListCell(string text)
+    {
+        Text = text;
+    }
+}
+
+public class ListBuilder
+{
+    public List<ListCell> Item = new();
+
+    public ListGenerate ListGenerate { get; set; }
+    public ListBuilder()
+    {
+        ListGenerate = new ListGenerate();
+    }
+
+    public ListBuilder SetTitle(string title)
+    {
+        ListGenerate.Title = title;
+        return this;
+    }
+
+    public ListBuilder AddItem(string item)
+    {
+        Item.Add(new(item));
+        return this;
+    }
+
+    public ListBuilder AddItem(ListCell item)
+    {
+        Item.Add(item);
+        return this;
+    }
+
+    public ListBuilder AddItems(IEnumerable<string> items)
+    {
+        foreach (var item in items)
+        {
+            Item.Add(new(item));
+        }
+        return this;
+    }
+
+    public ListBuilder AddItems(IEnumerable<ListCell> items)
+    {
+        foreach (var item in items)
+        {
+            Item.Add(item);
+        }
+        return this;
+    }
+
+    public ListBuilder SetFonwSize(int size)
+    {
+        ListGenerate.FonwSize = size;
+        return this;
+    }
+
+    public ListBuilder SetLineMaxTextLength(int length)
+    {
+        ListGenerate.LineMaxTextLength = length;
+        return this;
+    }
+
+    public ListBuilder SetTitleFontSize(int size)
+    {
+        ListGenerate.TitleFontSize = size;
+        return this;
+    }
+
+    public ListBuilder SetSignaturFontSize(int size)
+    {
+        ListGenerate.SignaturFontSize = size;
+        return this;
+    }
+
+    public ListBuilder SetGap(int gap)
+    {
+        ListGenerate.Gap = gap;
+        return this;
+    }
+
+    public ListBuilder SetTableMargin(int margin)
+    {
+        ListGenerate.ListMargin = margin;
+        return this;
+    }
+
+    public ListBuilder SetCardMargin(int margin)
+    {
+        ListGenerate.CardMargin = margin;
+        return this;
+    }
+
+    public ListBuilder SetListBottomMargin(int margin)
+    {
+        ListGenerate.ListBottomMargin = margin;
+        return this;
+    }
+
+    public ListBuilder SetCardTopMargin(int margin)
+    {
+        ListGenerate.CardTopMargin = margin;
+        return this;
+    }
+
+    public ListBuilder SetCardBottomMargin(int margin)
+    {
+        ListGenerate.CardBottomMargin = margin;
+        return this;
+    }
+
+    public ListBuilder SetSignature(string signature)
+    {
+        ListGenerate.Signature = signature;
+        return this;
+    }
+
+    public ListBuilder SetMemberOpenID(string openid)
+    {
+        ListGenerate.OpenID = openid;
+        return this;
+    }
+
+    public ListBuilder SetMinListWidth(int width)
+    {
+        ListGenerate.MinListWidth = width;
+        return this;
+    }
+
+    public ListBuilder SetCardBackgroundColor(Color color)
+    {
+        ListGenerate.CardBackgroundColor = color;
+        return this;
+    }
+
+    public ListBuilder SetListFontColor(Color color)
+    {
+        ListGenerate.ListFontColor = color;
+        return this;
+    }
+
+    public ListBuilder SetTitleColor(Color color)
+    {
+        ListGenerate.TitleColor = color;
+        return this;
+    }
+
+    public ListBuilder SetSignatureColor(Color color)
+    {
+        ListGenerate.SignatureColor = color;
+        return this;
+    }
+
+    public ListBuilder SetListThicknessColor(Color color)
+    {
+        ListGenerate.ListThicknessColor = color;
+        return this;
+    }
+
+    public static ListBuilder Create() => new();
+
+    public byte[] Build()
+    {
+        return ListGenerate.DrawContent(this);
+    }
+}
+
+public class ListGenerate
+{
+    public int FonwSize { get; set; } = 50;
+
+    public int LineMaxTextLength { get; set; } = 40;
+
+    public string BackgroundPath => ImageUtils.GetBotBackground();
+
+    public int TitleFontSize { get; set; } = 80;
+
+    public int SignaturFontSize { get; set; } = 20;
+
+    public int Gap { get; set; } = 40;
+
+    public int ListMargin { get; set; } = 100; // 表格与卡片边距
+
+    public int CardMargin { get; set; } = 140; // 卡片与图片边距
+
+    private int ListTopMargin { get; set; } = 400; // 列表上边距
+
+    public int ListBottomMargin { get; set; } = 80; // 列表下边距
+
+    public int CardTopMargin { get; set; } = 100; // 卡片上边距
+
+    public int CardBottomMargin { get; set; } = 50; // 卡片下边距
+
+    public string Title { get; set; } = "标题"; // 标题文本
+
+    public string Signature { get; set; } = "Generated by PatchouliBot";
+
+    public string OpenID { get; set; } = "459FC29AB246694C3C875A22A696A4FD";
+
+    public int MinListWidth { get; set; } = 1000; // 列表最小宽度
+
+    public Color CardBackgroundColor { get; set; } = Color.FromRgba(255, 255, 255, 230);
+
+    public Color ListFontColor { get; set; } = Color.Black;
+
+    public Color TitleColor { get; set; } = Color.Black;
+
+    public Color SignatureColor { get; set; } = Color.DarkGray;
+
+    public Color ListThicknessColor { get; set; } = Color.DarkGray;
+
+    public (int[] RowHeigth, int Width) ComputeLayout(ListBuilder builder)
+    {
+        var tableFont = ImageUtils.GetFontFamily().CreateFont(FonwSize);
+        var textSize = TextMeasurer.MeasureSize("A", new TextOptions(tableFont));
+        var textOption = new RichTextOptions(tableFont)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            WrappingLength = textSize.Width * LineMaxTextLength,
+            WordBreaking = WordBreaking.BreakAll
+        };
+        var RowHeigth = new int[builder.Item.Count];
+        int width = (int)textSize.Width;
+        for (var i = 0; i < builder.Item.Count; i++)
+        {
+            var size = TextMeasurer.MeasureSize(builder.Item[i].Text, textOption);
+            RowHeigth[i] = (int)size.Height;
+            width = (int)Math.Max(MinListWidth, Math.Max(width, size.Width));
+        }
+
+        return (RowHeigth, width);
+    }
+
+    public byte[] DrawContent(ListBuilder builder)
+    {
+        using var background = Image.Load<Rgba32>(BackgroundPath);
+        var fontFamily = ImageUtils.GetFontFamily();
+        var tableFont = fontFamily.CreateFont(FonwSize);
+        var titleFont = fontFamily.CreateFont(TitleFontSize);
+        var signFont = fontFamily.CreateFont(SignaturFontSize);
+
+        var textSize = TextMeasurer.MeasureSize("A", new TextOptions(tableFont));
+        var (RowHeigth, maxWidth) = ComputeLayout(builder);
+        maxWidth += 2 * ListMargin;
+        var maxHeight = RowHeigth.Sum(i => i + 2 * Gap) + ListTopMargin + ListBottomMargin; ;
+        var image = background.Crop(maxWidth + 2 * CardMargin, maxHeight + CardTopMargin + CardBottomMargin);
+        image.Mutate(d =>
+        {
+            DrawBackground(d, maxWidth, maxHeight);
+            DrawTitle(d, titleFont, maxWidth);
+            DrawAvatar(d, maxWidth);
+            DrawContentText(d, builder, tableFont, maxWidth, RowHeigth);
+            //DrawVerticalLines(d, builder, RowWidths, maxWidth, maxHeight);
+            DrawHorizontalLines(d, builder, RowHeigth, maxWidth, maxHeight);
+            DrawSignature(d, signFont, image.Width, maxHeight);
+        });
+
+        return image.ToBytesAsync().Result;
+    }
+
+    private void DrawContentText(IImageProcessingContext d, ListBuilder builder, Font tableFont, int maxWidth, int[] rowHeigth)
+    {
+        int yOffset = CardTopMargin + ListTopMargin;
+        var textSize = TextMeasurer.MeasureSize("A", new TextOptions(tableFont));
+        for (int i = 0; i < builder.Item.Count; i++)
+        {
+            var textOption = new RichTextOptions(tableFont)
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                WrappingLength = textSize.Width * LineMaxTextLength,
+                WordBreaking = WordBreaking.BreakAll,
+                Origin = new PointF(CardMargin + maxWidth / 2, yOffset + rowHeigth[i] / 2 + Gap)
+            };
+            var textColor = builder.Item[i].UseTextColor ? builder.Item[i].TextColor : ListFontColor;
+            d.DrawText(textOption, builder.Item[i].Text, textColor);
+            yOffset += rowHeigth[i] + 2 * Gap;
+        }
+    }
+
+    private void DrawHorizontalLines(IImageProcessingContext d, ListBuilder builder, int[] RowHeigth, int maxWidth, int maxHeight)
+    {
+        int yOffset = CardTopMargin + ListTopMargin;
+        for (int i = 0; i <= builder.Item.Count; i++)
+        {
+            d.DrawLine(ListThicknessColor, 1, new PointF(CardMargin + ListMargin, yOffset), new PointF(CardMargin + ListMargin + maxWidth - 2 * ListMargin, yOffset));
+            if (i < builder.Item.Count)
+            {
+                yOffset += RowHeigth[i] + 2 * Gap;
+            }
+        }
+        d.DrawLine(ListThicknessColor, 1, new PointF(CardMargin + ListMargin, CardTopMargin + ListTopMargin + maxHeight - ListTopMargin - ListBottomMargin), new PointF(CardMargin + ListMargin + maxWidth - 2 * ListMargin, CardTopMargin + ListTopMargin + maxHeight - ListTopMargin - ListBottomMargin));
+    }
+
+
+    private void DrawBackground(IImageProcessingContext d, int maxWidth, int maxHeight)
+    {
+        d.DrawRoundedRectangle(CardMargin, CardTopMargin, maxWidth, maxHeight, 60, CardBackgroundColor);
+    }
+
+    private void DrawTitle(IImageProcessingContext d, Font titleFont, int maxWidth)
+    {
+        var titleSize = TextMeasurer.MeasureSize(Title, new TextOptions(titleFont));
+        var titlePosition = new PointF(CardMargin + (maxWidth - titleSize.Width) / 2, CardTopMargin + 30);
+        d.DrawText(Title, titleFont, TitleColor, titlePosition);
+    }
+
+    public Image<Rgba32> GetAvatar(int size) => ImageUtils.GetAvatar(OpenID, size);
+
+    private void DrawAvatar(IImageProcessingContext d, int maxWidth)
+    {
+        var avatarSize = 200;
+        using var avatar = GetAvatar(avatarSize);
+        var avatarPosition = new Point(CardMargin + (maxWidth - avatarSize) / 2, CardTopMargin + 120);
+        d.DrawImage(avatar, avatarPosition, 1);
+    }
+
+    private void DrawSignature(IImageProcessingContext d, Font signFont, int imageWidth, int maxHeight)
+    {
+        var signTextOption = new RichTextOptions(signFont)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Origin = new PointF(imageWidth / 2, CardTopMargin + ListTopMargin + maxHeight - ListTopMargin - ListBottomMargin + 40)
+        };
+        d.DrawText(signTextOption, Signature, SignatureColor);
+    }
+}

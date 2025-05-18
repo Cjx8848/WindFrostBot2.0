@@ -10,6 +10,7 @@ namespace WindFrostBot.SDK
         public List<string> Parameters { get; private set; }
         public MessageEventArgs eventArgs { get; private set; }
         public QCommand Api { get; private set; }
+        public bool Handled = false;
         public CommandArgs(string msg,List<string> args, QCommand cmd)
         {
             Parameters = args;
@@ -17,6 +18,14 @@ namespace WindFrostBot.SDK
             eventArgs = cmd.eventArgs;
             Api = cmd;
             //EventArgs = eventarg;
+        }
+        public bool IsOwner()
+        {
+            if(MainSDK.BotConfig.OwnerOpenID == eventArgs.Author)
+            {
+                return true;
+            }
+            return false;
         }
     }
     public class CommandManager
@@ -26,7 +35,7 @@ namespace WindFrostBot.SDK
         public static void InitCommandToBot()
         {
             var client = MainSDK.QQClient;
-            client.OnMessageReceived += (sender, e) =>
+            client.OnMessageReceived += (sender, e) => //私聊消息部分
             {
                 if (!string.IsNullOrEmpty(e.Content))
                 {
@@ -41,7 +50,12 @@ namespace WindFrostBot.SDK
                         {
                             try
                             {
-                                cmd.Run(msg, arg, new QCommand(e, 1));
+                                var handler = new CommandArgs(msg, arg, new QCommand(e, 1));
+                                MainSDK.OnCommand.ExecuteAll(handler);
+                                if (!handler.Handled)
+                                {
+                                    cmd.Run(msg, arg, handler.Api);
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -49,9 +63,14 @@ namespace WindFrostBot.SDK
                             }
                         }
                     }
+                    else
+                    {
+                        var qcmd = new QCommand(e, 1);
+                        qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
+                    }
                 }
             };
-            client.OnGroupMessageReceived += (sender, e) =>
+            client.OnGroupMessageReceived += (sender, e) => //群聊消息部分
             {
                 string text = e.Content.Substring(1);//接收的所有消息
                 string msg = text.Split(" ")[0].ToLower().Replace("/","");//指令消息
@@ -64,13 +83,23 @@ namespace WindFrostBot.SDK
                     {
                         try
                         {
-                            cmd.Run(msg, arg, new QCommand(e));
+                            var handler = new CommandArgs(msg, arg, new QCommand(e));
+                            MainSDK.OnCommand.ExecuteAll(handler);
+                            if (!handler.Handled)
+                            {
+                                cmd.Run(msg, arg, handler.Api);
+                            }
                         }
                         catch (Exception ex)
                         {
                             Message.LogErro(ex.Message);
                         }
                     }
+                }
+                else
+                {
+                    var qcmd = new QCommand(e, 0);
+                    qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
                 }
             };
         }

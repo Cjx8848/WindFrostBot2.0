@@ -31,7 +31,6 @@ namespace ExampleP
             CommandManager.InitGroupCommand(this, TestCommand2, "测试指令", "test2", "测试2");
             CommandManager.InitPrivateCommand(this, TestCommand1, "测试指令", "test", "测试");
             CommandManager.InitPrivateCommand(this, TestCommand2, "测试指令", "test2", "测试2");
-
         }
         public static void TestCommand2(CommandArgs args)
         {
@@ -40,12 +39,7 @@ namespace ExampleP
         }
         public static void TestCommand1(CommandArgs args)
         {
-            string message = args.Message;
-            if(args.Parameters.Count > 0)
-            {
-                message += " " + string.Join(" ",args.Parameters);
-            }
-            args.Api.SendTextMessage(message);
+            args.Api.SendKeyBoard("102149794_1747455799");
         }
         public static void TestCommand(CommandArgs args)
         {
