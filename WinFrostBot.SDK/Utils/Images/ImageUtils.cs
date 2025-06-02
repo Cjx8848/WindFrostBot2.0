@@ -6,7 +6,7 @@ using SixLabors.ImageSharp.Processing;
 
 namespace WindFrostBot.SDK.Utils.Images;
 
-internal class ImageUtils
+public class ImageUtils
 {
     public static string GetBotBackground() => Directory.GetFiles("Pictures/BotBackgrounds").Rand();
     public FontFamily FontFamily { get; }

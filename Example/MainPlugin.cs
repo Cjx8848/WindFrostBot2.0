@@ -39,7 +39,7 @@ namespace ExampleP
         }
         public static void TestCommand1(CommandArgs args)
         {
-            args.Api.SendKeyBoard("102149794_1747455799");
+            args.Api.SendKeyBoard(args.Parameters[0]);
         }
         public static void TestCommand(CommandArgs args)
         {
