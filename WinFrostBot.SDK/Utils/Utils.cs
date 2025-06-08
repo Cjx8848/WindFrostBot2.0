@@ -10,6 +10,18 @@ namespace WindFrostBot.SDK.Utils
 {
     public static class Utils
     {
+        public static int ImgCount(this List<Attachment> atts)
+        {
+            int count = 0;
+            atts.ForEach(a =>
+            {
+                if (a.content_type.Contains("image"))
+                {
+                    count++;
+                }
+            });
+            return count;
+        }
         public static void DrawRoundedRectanglePath(this IImageProcessingContext context, float x, float y, float width, float height, float cornerRadius, int size, Rgba32 color)
         {
             if (cornerRadius <= 0)

@@ -11,12 +11,22 @@ namespace WindFrostBot.SDK
         public MessageEventArgs eventArgs { get; private set; }
         public QCommand Api { get; private set; }
         public bool Handled = false;
+        public List<Attachment> Attachments = new List<Attachment>();
         public CommandArgs(string msg,List<string> args, QCommand cmd)
         {
             Parameters = args;
             Message = msg;
             eventArgs = cmd.eventArgs;
             Api = cmd;
+            //EventArgs = eventarg;
+        }
+        public CommandArgs(string msg, List<string> args, QCommand cmd , List<Attachment> atts)
+        {
+            Parameters = args;
+            Message = msg;
+            eventArgs = cmd.eventArgs;
+            Api = cmd;
+            Attachments = atts;
             //EventArgs = eventarg;
         }
         public bool IsOwner()
@@ -50,11 +60,11 @@ namespace WindFrostBot.SDK
                         {
                             try
                             {
-                                var handler = new CommandArgs(msg, arg, new QCommand(e, 1));
+                                var handler = new CommandArgs(msg, arg, new QCommand(e, 1), e.Attachments);
                                 MainSDK.OnCommand.ExecuteAll(handler);
                                 if (!handler.Handled)
                                 {
-                                    cmd.Run(msg, arg, handler.Api);
+                                    cmd.Run(msg, arg, handler.Api, e.Attachments);
                                 }
                             }
                             catch (Exception ex)
@@ -77,17 +87,17 @@ namespace WindFrostBot.SDK
                 List<string> arg = text.Split(" ").ToList();
                 arg.Remove(text.Split(" ")[0]);//除去指令消息的其他段消息
                 var cmd = Coms.Find(c => c.Names.Contains(msg));
+                var handler = new CommandArgs(msg, arg, new QCommand(e), e.Attachments);
                 if (cmd != null)
                 {
                     if (cmd.Type == 0)
                     {
                         try
                         {
-                            var handler = new CommandArgs(msg, arg, new QCommand(e));
                             MainSDK.OnCommand.ExecuteAll(handler);
                             if (!handler.Handled)
                             {
-                                cmd.Run(msg, arg, handler.Api);
+                                cmd.Run(msg, arg, handler.Api, e.Attachments);
                             }
                         }
                         catch (Exception ex)
@@ -98,8 +108,12 @@ namespace WindFrostBot.SDK
                 }
                 else
                 {
-                    var qcmd = new QCommand(e, 0);
-                    qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
+                    MainSDK.OnAtEvent.ExecuteAll(handler);
+                    if (!handler.Handled)
+                    {
+                        var qcmd = new QCommand(e, 0);
+                        qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
+                    }
                 }
             };
         }
@@ -170,6 +184,18 @@ namespace WindFrostBot.SDK
         }
         public List<string> Names = new List<string>();
         public string HelpText = "";
+        public bool Run(string msg, List<string> parms, QCommand cmd ,List<Attachment> atts)
+        {
+            try
+            {
+                cd(new CommandArgs(msg, parms, cmd, atts));
+            }
+            catch (Exception ex)
+            {
+                Message.Erro("指令出错!:" + ex.ToString());
+            }
+            return true;
+        }
         public bool Run(string msg,List<string> parms,QCommand cmd)
         {
             try

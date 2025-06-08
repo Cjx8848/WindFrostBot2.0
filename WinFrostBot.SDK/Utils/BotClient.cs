@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WindFrostBot.SDK;
 using static Mysqlx.Expect.Open.Types.Condition.Types;
@@ -261,10 +262,14 @@ public class BotClient
         var author = data["author"]["user_openid"].Value<string>();
         var content = data["content"].Value<string>();
         var msgId = data["id"].Value<string>(); // 获取消息ID
-
+        var atts = new List<Attachment>();
+        if (data["attachments"] != null)
+        {
+            atts = JsonConvert.DeserializeObject<List<Attachment>>(data["attachments"].ToString());
+        }
         Message.Info($"Received Message from {author} : {content}");
 
-        OnMessageReceived?.Invoke(this, new MessageEventArgs("无", content, msgId, author));
+        OnMessageReceived?.Invoke(this, new MessageEventArgs("无", content, msgId, author, atts));
         //SendMessage(groupOpenId, $"{content}", msgId);
     }
     public async void SendMessage(string message, MessageEventArgs args, int seq = 1)
@@ -299,10 +304,14 @@ public class BotClient
         var content = data["content"].Value<string>();
         var groupOpenId = data["group_openid"].Value<string>();
         var msgId = data["id"].Value<string>(); // 获取消息ID
-
+        var atts = new List<Attachment>();
+        if(data["attachments"] != null)
+        {
+            atts = JsonConvert.DeserializeObject<List<Attachment>>(data["attachments"].ToString());
+        }
         Message.Info($"Received GroupMessage from {author} in group {groupOpenId} : {content}");
 
-        OnGroupMessageReceived?.Invoke(this, new MessageEventArgs(groupOpenId, content, msgId, author));
+        OnGroupMessageReceived?.Invoke(this, new MessageEventArgs(groupOpenId, content, msgId, author, atts));
     }
     public async void SendGroupMessage(string message, MessageEventArgs args, int seq = 1)
     {
@@ -568,15 +577,18 @@ public class MessageEventArgs : EventArgs
     public string MsgId { get; }
     public List<Attachment> Attachments { get; }
 
-    public MessageEventArgs(string groupOpenId, string content, string msgId, string author)
+    public MessageEventArgs(string groupOpenId, string content, string msgId, string author, List<Attachment> attachments)
     {
         GroupOpenId = groupOpenId;
         Content = content;
         MsgId = msgId;
         Author = author;
+        Attachments = attachments;
     }
 }
 public class Attachment
 {
-
+    public string content_type = "";
+    public string filename = "";
+    public string url = "";
 }
