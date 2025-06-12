@@ -5,6 +5,7 @@ namespace WindFrostBot.SDK
 {
     public class MainSDK
     {
+        public static FunctionManager<CommandArgs> OnChatEvent = new FunctionManager<CommandArgs>();
         public static FunctionManager<CommandArgs> OnAtEvent= new FunctionManager<CommandArgs>();
         public static FunctionManager<CommandArgs> OnCommand = new FunctionManager<CommandArgs>();
         public static FunctionManager<GroupMessageEvent> OnGroupAdd = new FunctionManager<GroupMessageEvent>();

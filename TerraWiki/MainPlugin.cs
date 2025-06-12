@@ -40,7 +40,15 @@ namespace TerraWikiPluin
             ProjectInfos = projectjson.ConfigObj;
             var prefixjson = new JsonRw<List<PrefixInfo>>(path + "/prefix_id.json");
             PrefixInfos = prefixjson.ConfigObj;
+            CommandManager.InitPrivateCommand(this, WikiCommand, "wiki指令", "wiki");
             CommandManager.InitGroupCommand(this, WikiCommand, "wiki指令", "wiki");
+
+            CommandManager.InitPrivateCommand(this, SearchItems, "搜物品", "搜物品", "物品", "si");
+            CommandManager.InitPrivateCommand(this, SearchBuffs, "搜增益", "搜增益", "增益", "sb");
+            CommandManager.InitPrivateCommand(this, SearchProjects, "搜弹幕", "搜弹幕", "弹幕", "sp");
+            CommandManager.InitPrivateCommand(this, SearchPrefix, "搜前缀", "搜前缀", "前缀", "spr");
+            CommandManager.InitPrivateCommand(this, SearchNpcs, "搜生物", "搜生物", "生物", "sn");
+
             CommandManager.InitGroupCommand(this, SearchItems, "搜物品", "搜物品", "物品", "si");
             CommandManager.InitGroupCommand(this, SearchBuffs, "搜增益", "搜增益", "增益", "sb");
             CommandManager.InitGroupCommand(this, SearchProjects, "搜弹幕", "搜弹幕", "弹幕", "sp");
@@ -205,6 +213,11 @@ namespace TerraWikiPluin
                 {
                     message.Add("\u0023\uFE0F\u20E3" + item.Description.Replace("\n", "\n\u0023\uFE0F\u20E3"));
                 }
+                if(args.Api.Type == 1)
+                {
+                    args.Api.SendTextMessage( "☾搜物品☽\n" + string.Join("\n", message));
+                    return;
+                }
                 args.Api.SendTextWithImage(File.ReadAllBytes(itempath), "\n☾搜物品☽\n" + string.Join("\n", message));
                 return;
             }
@@ -236,6 +249,11 @@ namespace TerraWikiPluin
                 if (!string.IsNullOrEmpty(item.Description))
                 {
                     message.Add("\u0023\uFE0F\u20E3" + item.Description.Replace("\n", "\n\u0023\uFE0F\u20E3"));
+                }
+                if (args.Api.Type == 1)
+                {
+                    args.Api.SendTextMessage("☾搜物品☽\n" + string.Join("\n", message));
+                    return;
                 }
                 args.Api.SendTextWithImage(File.ReadAllBytes(itempath), "\n☾搜物品☽\n" + string.Join("\n", message));
             }

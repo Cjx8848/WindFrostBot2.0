@@ -176,13 +176,14 @@ public class BotClient
                     case "GROUP_ADD_ROBOT"://机器人被添加到群的事件
                         string memberopenid = data["op_member_openid"].Value<string>();
                         string groupopenid = data["group_openid"].Value<string>();
-                        var groupevent = new GroupMessageEvent(groupopenid, memberopenid);
+                        var groupevent = new GroupMessageEvent(groupopenid, memberopenid, message["id"].Value<string>());
+                        Message.Info($"Group_Add_Event Message:{message.ToString()}");
                         MainSDK.OnGroupAdd.ExecuteAll(groupevent);
                         break;
                     case "GROUP_DEL_ROBOT"://机器人被移除群聊事件
                         memberopenid = data["op_member_openid"].Value<string>();
                         groupopenid = data["group_openid"].Value<string>();
-                        groupevent = new GroupMessageEvent(groupopenid, memberopenid);
+                        groupevent = new GroupMessageEvent(groupopenid, memberopenid, message["id"].Value<string>());
                         MainSDK.OnGroupRemove.ExecuteAll(groupevent);
                         break;
                     case "GROUP_MSG_REJECT"://群聊主动消息关闭事件
@@ -195,6 +196,7 @@ public class BotClient
                         break;
                     case "FRIEND_ADD"://私聊好友添加事件
                         var openid = data["openid"].Value<string>();
+                        Message.Info($"Friend_Add_Event Message:{message.ToString()}");
                         break;
                     case "FRIEND_DEL"://私聊好友删除事件
                         openid = data["openid"].Value<string>();
@@ -280,6 +282,8 @@ public class BotClient
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
             client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
 
+            Message.Erro(args.MsgId);
+
             var postData = new JObject
             {
                 ["content"] = message,
@@ -293,6 +297,195 @@ public class BotClient
             var responseString = await response.Content.ReadAsStringAsync();
 
             Message.Info("Sent Message Response: " + responseString);
+        }
+    }
+    public async Task SendMessageMedia(MessageEventArgs args, string fileUrl, int seq = 1)
+    {
+        try
+        {
+            await GetAccessToken();
+            Message.Info("尝试发送: " + fileUrl);
+
+            if (string.IsNullOrEmpty(fileUrl))
+            {
+                throw new Exception("Failed to upload the file to the server.");
+            }
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                //Message.Info(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+
+                var messageData = new JObject
+                {
+                    //["content"] = "", // Ensure content is not null or empty
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["msg_seq"] = seq
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/messages", content);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+
+                Message.Info("Sent Media Message Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
+        }
+    }
+    public async Task SendMessageMedia(MessageEventArgs args, byte[] data, string text, int seq = 1, string name = "upload.jpg")
+    {
+        try
+        {
+            await GetAccessToken();
+            string fileUrl = UploadImageToServer(data, name).Result;
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+                var messageData = new JObject
+                {
+                    ["content"] = text,
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["image"] = fileUrl,
+                    ["msg_seq"] = seq
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/messages", content);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+                FileServerDelete(name);
+                Message.Info("Sent TextMedia Message Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
+        }
+    }
+    public async Task SendMessageMedia(MessageEventArgs args, byte[] data, int seq = 1, string name = "upload.jpg")
+    {
+        try
+        {
+            await GetAccessToken();
+            string fileUrl = UploadImageToServer(data, name).Result;
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+
+                // Get file info for the uploaded file
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                //Message.Info(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+
+                var messageData = new JObject
+                {
+                    //["content"] = "",
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["msg_seq"] = seq
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/users/{args.Author}/messages", content);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+                FileServerDelete(name);
+                Message.Info("Sent Media Message Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
         }
     }
     #endregion
@@ -312,6 +505,30 @@ public class BotClient
         Message.Info($"Received GroupMessage from {author} in group {groupOpenId} : {content}");
 
         OnGroupMessageReceived?.Invoke(this, new MessageEventArgs(groupOpenId, content, msgId, author, atts));
+    }
+    public async void SendGroupMessage(string message, MessageEventArgs args,string eventid, int seq = 1)
+    {
+        await GetAccessToken();
+        using (var client = new HttpClient())
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+            client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+
+            var postData = new JObject
+            {
+                ["content"] = message,
+                ["msg_type"] = 0, // 文本消息
+                ["msg_id"] = args.MsgId,
+                ["event_id"] = eventid,
+                ["msg_seq"] = seq
+            };
+            var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", content);
+            var responseString = await response.Content.ReadAsStringAsync();
+
+            Message.Info("Sent GroupMessage Response: " + responseString);
+        }
     }
     public async void SendGroupMessage(string message, MessageEventArgs args, int seq = 1)
     {
@@ -387,7 +604,8 @@ public class BotClient
                     ["media"] = new JObject
                     {
                         ["file_info"] = fileInfo
-                    }
+                    },
+                    ["msg_seq"] = seq
                 };
 
                 var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
@@ -445,7 +663,8 @@ public class BotClient
                     {
                         ["file_info"] = fileInfo
                     },
-                    ["image"] = fileUrl
+                    ["image"] = fileUrl,
+                    ["msg_seq"] = seq
                 };
 
                 var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
@@ -507,7 +726,8 @@ public class BotClient
                     ["media"] = new JObject
                     {
                         ["file_info"] = fileInfo
-                    }
+                    },
+                    ["msg_seq"] = seq
                 };
 
                 var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
@@ -515,6 +735,134 @@ public class BotClient
                 var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
                 FileServerDelete(name);
                 Message.Info("Sent Media Message Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
+        }
+    }
+    public async Task SendGroupMedia(MessageEventArgs args, string fileUrl, string eventid, int seq = 1)
+    {
+        try
+        {
+            await GetAccessToken();
+            Message.Info("尝试发送: " + fileUrl);
+
+            if (string.IsNullOrEmpty(fileUrl))
+            {
+                throw new Exception("Failed to upload the file to the server.");
+            }
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["event_id"] = eventid,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                //Message.Info(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+
+                var messageData = new JObject
+                {
+                    //["content"] = "", // Ensure content is not null or empty
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["msg_seq"] = seq
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", messageContent);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+
+                Message.Info("Sent Media GroupMessage Response: " + messageResponseString);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Erro("Error: " + ex.Message);
+        }
+    }
+    public async Task SendGroupMedia(MessageEventArgs args, byte[] data, string text, string eventid, int seq = 1, string name = "upload.jpg")
+    {
+        try
+        {
+            await GetAccessToken();
+            string fileUrl = UploadImageToServer(data, name).Result;
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("QQBot", accessToken);
+                client.DefaultRequestHeaders.Add("X-Union-Appid", appId);
+                var postData = new JObject
+                {
+                    ["file_type"] = 1,
+                    ["url"] = fileUrl,
+                    ["srv_send_msg"] = false,
+                    ["event_id"] = eventid,
+                    ["msg_seq"] = seq
+                };
+
+                var content = new StringContent(postData.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/files", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                var jsonResponse = JObject.Parse(responseString);
+
+                if (string.IsNullOrEmpty(jsonResponse["file_info"]?.Value<string>()))
+                {
+                    throw new Exception("Image upload failed: " + jsonResponse["message"]?.Value<string>());
+                }
+
+                string fileInfo = jsonResponse["file_info"]?.Value<string>();
+                if (string.IsNullOrEmpty(fileInfo))
+                {
+                    throw new Exception("Failed to retrieve file_info from the response.");
+                }
+                var messageData = new JObject
+                {
+                    ["content"] = text,
+                    ["msg_id"] = args.MsgId,
+                    ["msg_type"] = 7,
+                    ["media"] = new JObject
+                    {
+                        ["file_info"] = fileInfo
+                    },
+                    ["image"] = fileUrl,
+                    ["msg_seq"] = seq
+                };
+
+                var messageContent = new StringContent(messageData.ToString(), Encoding.UTF8, "application/json");
+                var messageResponse = await client.PostAsync($"https://api.sgroup.qq.com/v2/groups/{args.GroupOpenId}/messages", messageContent);
+                var messageResponseString = await messageResponse.Content.ReadAsStringAsync();
+                FileServerDelete(name);
+                Message.Info("Sent TextMedia Message Response: " + messageResponseString);
             }
         }
         catch (Exception ex)
@@ -575,8 +923,14 @@ public class MessageEventArgs : EventArgs
     public string GroupOpenId { get; }
     public string Content { get; }
     public string MsgId { get; }
+    public string EventId { get; }
     public List<Attachment> Attachments { get; }
-
+    public MessageEventArgs(string groupOpenId, string eventid, string author)
+    {
+        GroupOpenId = groupOpenId;
+        Author = author;
+        EventId = eventid;
+    }
     public MessageEventArgs(string groupOpenId, string content, string msgId, string author, List<Attachment> attachments)
     {
         GroupOpenId = groupOpenId;

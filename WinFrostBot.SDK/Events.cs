@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WindFrostBot.SDK
 {
@@ -10,10 +6,13 @@ namespace WindFrostBot.SDK
     {
         public string GroupOpenID = "";
         public string UserOpenID = "";
-        public GroupMessageEvent(string groupOpenID, string userOpenID)
+        public QCommand Api;
+        public GroupMessageEvent(string groupOpenID, string userOpenID ,string eventid)
         {
             GroupOpenID = groupOpenID;
             UserOpenID = userOpenID;
+            var eventArg = new MessageEventArgs(GroupOpenID, eventid, userOpenID);
+            Api = new QCommand(eventArg, 2);
         }
     }
     public class MessageEvent : EventArgs

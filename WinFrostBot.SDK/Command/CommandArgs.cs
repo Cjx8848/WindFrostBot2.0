@@ -54,18 +54,14 @@ namespace WindFrostBot.SDK
                     List<string> arg = text.Split(" ").ToList();
                     arg.Remove(text.Split(" ")[0]);//除去指令消息的其他段消息
                     var cmd = PrivateComs.Find(c => c.Names.Contains(msg));
+                    var handler = new CommandArgs(msg, arg, new QCommand(e, 1), e.Attachments);
                     if (cmd != null)
                     {
                         if (cmd.Type == 1)
                         {
                             try
                             {
-                                var handler = new CommandArgs(msg, arg, new QCommand(e, 1), e.Attachments);
-                                MainSDK.OnCommand.ExecuteAll(handler);
-                                if (!handler.Handled)
-                                {
-                                    cmd.Run(msg, arg, handler.Api, e.Attachments);
-                                }
+                                cmd.Run(msg, arg, handler.Api, e.Attachments);
                             }
                             catch (Exception ex)
                             {
@@ -75,8 +71,12 @@ namespace WindFrostBot.SDK
                     }
                     else
                     {
-                        var qcmd = new QCommand(e, 1);
-                        qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
+                        MainSDK.OnChatEvent.ExecuteAll(handler);
+                        if (!handler.Handled)
+                        {
+                            var qcmd = new QCommand(e, 1);
+                            qcmd.SendTextMessage("不存在该指令~\n没准在幻想乡?");
+                        }
                     }
                 }
             };
