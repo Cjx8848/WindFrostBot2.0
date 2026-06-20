@@ -1,1 +1,2 @@
-一个用于QQ官方机器人的SDK
+该项目已弃用
+新项目: https://github.com/Cjx8848/Windy
